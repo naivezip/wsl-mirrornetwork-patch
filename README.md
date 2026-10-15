@@ -75,6 +75,31 @@ flowchart TD
 
 ---
 
+## ⚠️ 注意事项与已知连带影响 (Trade-offs)
+
+> [!IMPORTANT]
+> **在安装前请注意：** 本补丁通过关闭宿主机物理网卡的 IPv4 路由转发（`Forwarding: Disabled`）来阻断 Windows 与 TUN 之间的死锁回路。对于单机日常开发、本地 Docker/WSL 运行、游戏、以及常规内网穿透客户端（Radmin / Tailscale / 向日葵 等作为客户端通信）**完全无任何负面影响**。但以下**依赖宿主机“充当路由器/网关中转”**的特殊场景会受影响：
+
+### 1. Windows 移动热点（给手机/平板开 Wi-Fi 共享网络）⚠️
+* **影响表现**：电脑开启“移动热点”后，手机、平板连接电脑发射的 Wi-Fi 可能会提示**“无互联网连接”**。
+* **原因**：手机通过电脑借道上网属于典型的路由中转流量（ICS），需要物理网卡开启转发才能把包送出去；物理网卡 Forwarding 被禁用后，该中转会被 Windows 拦截。
+* **应对方案**：
+  * 若您日常**高度依赖电脑开热点**给其他设备上网，建议权衡是否使用系统代理（System Proxy）替代全局 TUN 模式；
+  * 或者在需要开热点时，临时在管理员终端手动打开物理网卡转发：
+    ```powershell
+    # 临时恢复转发（以当前联网网卡为例）
+    Set-NetIPInterface -InterfaceAlias "以太网" -AddressFamily IPv4 -Forwarding Enabled -PolicyStore ActiveStore
+    ```
+
+### 2. 将本机配置为网络中转跳板（Exit Node / Subnet Router）
+* **影响表现**：若您使用 Tailscale、ZeroTier 将当前电脑设为整个局域网的**出口节点（Exit Node）**或**子网路由器（Subnet Router）**，让外部其他设备借用本机宽带上网，该功能会受限。
+* *(注：普通的客户端点对点远程桌面、联机打游戏不受任何影响)*
+
+### 3. Wi-Fi / 有线切换与睡眠唤醒的空窗期
+* 当拔插网线切换到 Wi-Fi、或者电脑休眠唤醒后，Windows HNS 可能会重新激活物理网卡转发。本补丁默认每小时定时纠偏一次；若切换网络后偶遇直连短暂卡顿，无需重启系统，手动右键运行一次 `DisableEthernetForwarding.ps1` 即可瞬间恢复。
+
+---
+
 ## 🚀 快速开始
 
 ### 方式一：PowerShell 一键在线安装（推荐）
